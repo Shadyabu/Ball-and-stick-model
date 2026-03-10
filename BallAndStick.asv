@@ -1,0 +1,299 @@
+load('data');
+dwis=double(dwis);
+dwis=permute(dwis,[4,1,2,3]);
+
+% Middle slice of the 1st image volume, which has b=0
+figure;
+imshow(flipud(squeeze(dwis(1,:,:,72))'), []);
+% Middle slice of the 2nd image volume, which has b=1000
+figure;
+imshow(flipud(squeeze(dwis(2,:,:,72))'), []);
+qhat = load('bvecs');
+bvals = 1000*sum(qhat.*qhat);
+
+Avox = dwis(:,92,65,72);
+% Define a starting point for the non-linear fit
+startx = [3.5e+00 3e-03 2.5e-01 0 0];
+% Define various options for the non-linear fitting
+% algorithm.
+isQ1_1 = true;
+h=optimset('Display', 'iter', ...
+'MaxFunEvals',20000,...
+'Algorithm','quasi-newton',...
+'TolX',1e-10,...
+'TolFun',1e-10);
+% Now run the fitting
+disp('Running the first fit from Q1.1')
+[parameter_hat,RESNORM,EXITFLAG,OUTPUT]=fminunc('BallStickSSD',startx,h,Avox,bvals,qhat,isQ1_1);
+
+format short e
+
+% Display parameter_hat and RESNORM
+disp(parameter_hat)
+
+disp(RESNORM)
+
+% Experimenting with different fminunc options
+disp('Experimenting with fminunc (Q1.1)')
+h = optimset('Display', 'iter', ...
+             'MaxFunEvals', 500, ...
+             'MaxIter', 200, ...
+             'TolX', 1e-10, ...
+             'TolFun', 1e-10);
+[parameter_hat,RESNORM,EXITFLAG,OUTPUT]=fminunc('BallStickSSD',startx,h,Avox,bvals,qhat,true);
+
+% Running original fit again to plot it
+disp('Rerunning original fit to plot')
+h=optimset('Display', 'iter', ...
+'MaxFunEvals',20000,...
+'Algorithm','quasi-newton',...
+'TolX',1e-10,...
+'TolFun',1e-10);
+[parameter_hat,RESNORM,EXITFLAG,OUTPUT]=fminunc('BallStickSSD',startx,h,Avox,bvals,qhat,true);
+
+% PLOT THE FIT
+% Step 1: Extract the fitted parameters from parameter_hat
+S0    = parameter_hat(1);
+diff  = parameter_hat(2);
+f     = parameter_hat(3);
+theta = parameter_hat(4);
+phi   = parameter_hat(5);
+
+% Step 2: Recompute the model predictions (same formula as in BallStickSSD)
+fibdir     = [cos(phi)*sin(theta), sin(phi)*sin(theta), cos(theta)];
+fibdotgrad = sum(qhat .* repmat(fibdir, [length(qhat) 1])', 1);
+S_pred     = S0 * (f*exp(-bvals*diff.*(fibdotgrad.^2)) + (1-f)*exp(-bvals*diff));
+
+% Step 3: Plot actual data vs model predictions
+figure;
+plot(Avox, 'bs', 'MarkerSize', 10, 'LineWidth', 2);   % blue squares = data
+hold on;
+plot(S_pred, 'rx', 'MarkerSize', 10, 'LineWidth', 2); % red crosses = model
+legend('Data', 'Model');
+xlabel('Measurement index k');
+ylabel('Signal S');
+title('Ball-and-Stick model fit vs actual data');
+
+% -------------------------------------------------------------------------
+% Question 1.2
+% -------------------------------------------------------------------------
+fprintf('\n%s\n', 'QUESTION 1.2 --------------')
+
+isQ1_1 = false;
+% Run fit with only realistic values
+disp('Running fit with only realistic values')
+[parameter_hat,RESNORM,EXITFLAG,OUTPUT]=fminunc('BallStickSSD',startx,h,Avox,bvals,qhat,isQ1_1);
+
+% Change starting point
+startx = [sqrt(3.5e+00), sqrt(3e-03), log(0.25/0.75), 0, 0];
+% Run fit again with different starting point
+disp('Running realistic fit with different starting point (Q1.1)')
+[parameter_hat,RESNORM,EXITFLAG,OUTPUT]=fminunc('BallStickSSD',startx,h,Avox,bvals,qhat,isQ1_1);
+
+% PLOT NEW FIT
+% Step 1: Extract the fitted parameters from parameter_hat
+S0    = parameter_hat(1)^2;
+diff  = parameter_hat(2)^2;
+f     = 1 / (1 + exp(-parameter_hat(3)));
+theta = parameter_hat(4);
+phi   = parameter_hat(5);
+
+% Step 2: Recompute the model predictions (same formula as in BallStickSSD)
+fibdir     = [cos(phi)*sin(theta), sin(phi)*sin(theta), cos(theta)];
+fibdotgrad = sum(qhat .* repmat(fibdir, [length(qhat) 1])', 1);
+S_pred     = S0 * (f*exp(-bvals*diff.*(fibdotgrad.^2)) + (1-f)*exp(-bvals*diff));
+
+% Step 3: Plot actual data vs model predictions
+figure;
+plot(Avox, 'bs', 'MarkerSize', 10, 'LineWidth', 2);   % blue squares = data
+hold on;
+plot(S_pred, 'rx', 'MarkerSize', 10, 'LineWidth', 2); % red crosses = model
+legend('Data', 'Model');
+xlabel('Measurement index k');
+ylabel('Signal S');
+title('Ball-and-Stick model fit vs actual data');
+
+disp('Parameter values for Q1.2')
+fprintf('S0: %e\n', S0)
+fprintf('diff: %e\n', diff)
+fprintf('f: %e\n', f)
+fprintf('theta: %e\n', theta)
+fprintf('phi: %e\n', phi)
+fprintf('RESNORM: %e\n', RESNORM)
+
+% -------------------------------------------------------------------------
+% Question 1.3
+% -------------------------------------------------------------------------
+
+fprintf('\n%s\n', 'QUESTION 1.3 --------------')
+
+nRuns = 100;  % number of random starts
+results = zeros(nRuns, 1);  % store RESNORM for each run
+params = zeros(nRuns, 5);   % store parameter_hat for each run
+
+% Turn off display for speed
+h=optimset('Display', 'off', ...
+'MaxFunEvals',20000,...
+'Algorithm','quasi-newton',...
+'TolX',1e-10,...
+'TolFun',1e-10); 
+
+rng(42)
+for i = 1:nRuns
+    % Add random perturbation scaled to each parameter
+    startx_rand = startx + [randn*3.5, randn*1e-3, randn*0.5, randn*pi, randn*2*pi];    
+
+    % Run the fit
+    [ph, rn] = fminunc('BallStickSSD', startx_rand, h, Avox, bvals, qhat, isQ1_1);
+    
+    results(i) = rn;
+    params(i,:) = ph;
+end
+
+% Find the best (lowest) RESNORM
+[best_RESNORM, best_idx] = min(results);
+best_params = params(best_idx, :);
+
+% Count how many runs found the global min (within a small tolerance)
+tolerance = 1e3;  % runs within 1000 of best count as "finding" it
+n_found = sum(results < best_RESNORM + tolerance);
+proportion = n_found / nRuns;
+
+fprintf('Best RESNORM: %.4e\n', best_RESNORM);
+fprintf('Proportion finding global min: %.2f\n', proportion);
+
+n_needed = ceil(log(0.05) / log(1 - proportion));
+fprintf('Runs needed for 95%% confidence: %d\n', n_needed);
+
+% Trying fit on other Voxels
+fprintf('\n%s\n', 'Trying fit on other Voxels')
+voxels = {
+    dwis(:, 85, 128, 72),  'Voxel (85, 128, 72)';
+    dwis(:, 43, 64, 82), 'Voxel (43, 64, 82)';
+};
+
+for v = 1:size(voxels, 1)
+    Avox_test = voxels{v, 1};
+    voxel_name = voxels{v, 2};
+    
+    results_v = zeros(nRuns, 1);
+
+    rng(42)
+    for i = 1:nRuns
+        startx_rand = startx + [randn*3.5, randn*1e-3, randn, randn*pi, randn*2*pi];
+        [~, rn] = fminunc('BallStickSSD', startx_rand, h, Avox_test, bvals, qhat, isQ1_1);
+        results_v(i) = rn;
+    end
+    
+    best_RESNORM_v = min(results_v);
+    n_found_v = sum(results_v < best_RESNORM_v + tolerance);
+    proportion_v = n_found_v / nRuns;
+    n_needed_v = ceil(log(0.05) / log(1 - proportion_v));
+    
+    fprintf('\n%s\n', voxel_name);
+    fprintf('  Best RESNORM:               %.4e\n', best_RESNORM_v);
+    fprintf('  Expected RESNORM (noise):   %.4e\n', 108 * 200^2);
+    fprintf('  Proportion finding global min: %.2f\n', proportion_v);
+    fprintf('  Runs needed for 95%% confidence: %d\n', n_needed_v);
+end
+
+% -------------------------------------------------------------------------
+% Question 1.4
+% -------------------------------------------------------------------------
+fprintf('\n%s\n', 'QUESTION 1.4 --------------')
+
+nX = 145;
+nY = 174;
+
+% Pre-allocate maps (filled with zeros to start)
+S0_map    = zeros(nX, nY);
+d_map     = zeros(nX, nY);
+f_map     = zeros(nX, nY);
+theta_map = zeros(nX, nY);
+phi_map   = zeros(nX, nY);
+resnorm_map = zeros(nX, nY);
+
+nRuns = 3; % Number of random restarts per voxel to get 95% confidence of global minimum
+
+
+for x = 1:nX
+    for y = 1:nY
+        Avox = dwis(:, x, y, 72);  % 108-element signal vector for this voxel
+        
+        % Skip empty/background voxels to save time
+        if mean(Avox) < 50
+            continue
+        end
+        
+        bestResnorm = inf;
+        bestParams  = zeros(1,5);
+        
+        for r = 1:nRuns
+            % Perturbed starting point (same approach as Q1.3)
+            startx_rand = startx + [randn*3.5, randn*1e-3, randn, randn*pi, randn*2*pi];
+
+            % Apply inverse transformation for constrained version (Q1.2)
+            % e.g., startx_transformed(1) = sqrt(startx(1)), etc.
+            
+            try
+                [p_hat, resnorm] = fminunc('BallStickSSD', ...
+                                            startx_rand, h, ...
+                                            Avox, bvals, qhat, isQ1_1);
+                if resnorm < bestResnorm
+                    bestResnorm = resnorm;
+                    bestParams  = p_hat;
+                end
+            catch
+                % If fitting fails for some reason, just skip
+            end
+        end
+        
+        % Apply forward transformation to get actual parameter values
+        S0_map(x,y)      = bestParams(1)^2;
+        d_map(x,y)       = bestParams(2)^2;
+        f_map(x,y)       = 1 / (1 + exp(-bestParams(3)));
+        theta_map(x,y)   = bestParams(4);
+        phi_map(x,y)     = bestParams(5);
+        resnorm_map(x,y) = bestResnorm;
+    end
+    fprintf('Row %d/%d done\n', x, nX); % Progress indicator
+end
+
+% figure of parameter maps
+figure;
+subplot(2,2,1); imagesc(S0_map');    colorbar; title('S0');       colormap(gca, 'gray');
+subplot(2,2,2); imagesc(d_map', [0, 5e-3]);     colorbar; title('diff');        colormap(gca, 'hot');
+subplot(2,2,3); imagesc(f_map');     colorbar; title('f');        colormap(gca, 'hot');
+subplot(2,2,4); imagesc(resnorm_map'); colorbar; title('RESNORM'); colormap(gca, 'hot');
+
+
+% Converting theta and phi to vector n
+nx = cos(phi_map) .* sin(theta_map);
+ny = sin(phi_map) .* sin(theta_map);
+nz = cos(theta_map);
+
+% FIBRE DIRECTION MAP
+% Force consistent direction: flip if nz < 0
+flip_mask = nz < 0;
+nx(flip_mask) = -nx(flip_mask);
+ny(flip_mask) = -ny(flip_mask);
+
+% Weight by volume fraction f
+nx_weighted = nx .* f_map;
+ny_weighted = ny .* f_map;
+
+% Create coordinate grids for quiver
+[Y_grid, X_grid] = meshgrid(1:nY, 1:nX);
+
+figure;
+% Show anatomy as background
+imagesc(S0_map');
+quiver(X_grid, Y_grid, nx_weighted, ny_weighted, 3);
+% The 0.5 is a scale factor — adjust to taste
+axis equal;
+title('Fibre direction n weighted by f');
+
+% -------------------------------------------------------------------------
+% Question 1.5
+% -------------------------------------------------------------------------
+fprintf('\n%s\n', 'QUESTION 1.5 --------------')
