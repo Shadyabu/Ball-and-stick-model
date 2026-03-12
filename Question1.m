@@ -1,3 +1,8 @@
+% Code was written with the help of AI. All instructions of what to code,
+% analysis and write up was done manually, without AI.
+
+% PLEASE ADD data.mat INTO THE DIRECTORY BEFORE RUNNING THE CODE
+
 load('data');
 dwis=double(dwis);
 dwis=permute(dwis,[4,1,2,3]);
@@ -74,7 +79,7 @@ xlabel('Measurement index k');
 ylabel('Signal S');
 title('Ball-and-Stick model fit vs actual data');
 
-% -------------------------------------------------------------------------
+%% -------------------------------------------------------------------------
 % Question 1.2
 % -------------------------------------------------------------------------
 fprintf('\n%s\n', 'QUESTION 1.2 --------------')
@@ -121,7 +126,7 @@ fprintf('theta: %e\n', theta)
 fprintf('phi: %e\n', phi)
 fprintf('RESNORM: %e\n', RESNORM)
 
-% -------------------------------------------------------------------------
+%% -------------------------------------------------------------------------
 % Question 1.3
 % -------------------------------------------------------------------------
 
@@ -197,7 +202,7 @@ for v = 1:size(voxels, 1)
     fprintf('  Runs needed for 95%% confidence: %d\n', n_needed_v);
 end
 
-% -------------------------------------------------------------------------
+%% -------------------------------------------------------------------------
 % Question 1.4
 % -------------------------------------------------------------------------
 fprintf('\n%s\n', 'QUESTION 1.4 --------------')
@@ -295,10 +300,11 @@ quiver(X_grid, Y_grid, nx_weighted, ny_weighted, 4);
 axis equal;
 title('Fibre direction n weighted by f');
 
-% -------------------------------------------------------------------------
+%% -------------------------------------------------------------------------
 % Question 1.5
 % -------------------------------------------------------------------------
 fprintf('\n%s\n', 'QUESTION 1.5 --------------')
+startx_con = [3.5e+00, 3e-03, 0.25, 0, 0];
 
 % ---- Pre-allocate maps ----
 S0_map_dt    = zeros(nX, nY);

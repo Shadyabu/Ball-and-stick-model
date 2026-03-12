@@ -1,3 +1,8 @@
+% Code was written with the help of AI. All instructions of what to code,
+% analysis and write up was done manually, without AI.
+
+% PLEASE ADD data.mat INTO THE DIRECTORY BEFORE RUNNING THE CODE
+
 % =========================================================================
 % Q2.1 - Classical Bootstrap (STANDALONE SCRIPT)
 % Run this independently - does NOT require Q1 to have run first.
